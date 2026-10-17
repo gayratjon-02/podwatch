@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "podwatch"
+version = "0.1.0"
+description = "Live terminal dashboard for GPU pods: GPU load, a loss sparkline and the newest log lines over ssh."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["rich>=13"]
+
+[project.scripts]
+podwatch = "podwatch.cli:main"
+
+[tool.setuptools]
+packages = ["podwatch"]
