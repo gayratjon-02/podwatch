@@ -1,18 +1,28 @@
-# Copy to pods.toml and edit. pods.toml is git-ignored so real addresses never get committed.
+# Copy to pods.toml and edit. pods.toml is git-ignored, so real addresses never get committed.
 # Top level keys are defaults for every pod; a [[pod]] table can override any of them.
+# Leave user, port and key out and ssh decides, so Host aliases from ~/.ssh/config just work.
 
-user = "root"
-key = "~/.ssh/id_ed25519"
-root = "/workspace"            # remote directory scanned for *.log files and the metrics file
+root = "/workspace"             # remote directory scanned for *.log files and the metrics file
 train_log = "trainer_log.jsonl" # name of the per-step metrics file, one JSON object per line
 
+# Rented GPU pods: a public address, a port and root.
 [[pod]]
-name = "pod1"
+name = "rented-1"
 host = "203.0.113.10"
-port = 22
-
-[[pod]]
-name = "pod2"
-host = "203.0.113.11"
 port = 40022
-root = "/workspace/experiments"
+user = "root"
+key = "~/.ssh/id_ed25519"
+
+# A server behind a bastion: reach it with ssh -J. The user is a plain account that can read the logs.
+[[pod]]
+name = "prod-train-1"
+host = "10.0.4.21"
+user = "podwatch"
+jump = "ops@bastion.example.com"
+root = "/srv/training/runs"
+
+# Or put the details in ~/.ssh/config and use the alias; podwatch adds nothing on top of it.
+[[pod]]
+name = "lab-box"
+host = "lab-box"
+root = "/home/me/experiments"

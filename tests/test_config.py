@@ -17,8 +17,21 @@ class ConfigTest(unittest.TestCase):
         path = write('root = "/data"\n[[pod]]\nname = "a"\nhost = "203.0.113.1"\n'
                      '[[pod]]\nname = "b"\nhost = "203.0.113.2"\nport = 2222\nroot = "/other"\n')
         a, b = load_config(path)
-        self.assertEqual((a.port, a.user, a.root), (22, "root", "/data"))
+        self.assertEqual((a.port, a.user, a.jump, a.root), (None, None, None, "/data"))
         self.assertEqual((b.port, b.root), (2222, "/other"))
+
+    def test_jump_and_user_defaults_apply_to_every_pod(self):
+        path = write('user = "ops"\njump = "ops@bastion"\n[[pod]]\nname = "a"\nhost = "h1"\n')
+        (a,) = load_config(path)
+        self.assertEqual((a.user, a.jump), ("ops", "ops@bastion"))
+
+    def test_option_like_jump_is_refused(self):
+        with self.assertRaises(ConfigError):
+            load_config(write('[[pod]]\nname = "a"\nhost = "h"\njump = "-oProxyCommand=x"\n'))
+
+    def test_bad_port(self):
+        with self.assertRaises(ConfigError):
+            load_config(write('[[pod]]\nname = "a"\nhost = "h"\nport = 70000\n'))
 
     def test_missing_host(self):
         with self.assertRaises(ConfigError):

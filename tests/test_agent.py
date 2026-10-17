@@ -21,7 +21,46 @@ def first_snapshot(root: Path, train_log: str = "trainer_log.jsonl") -> dict:
         proc.stdout.close()
 
 
+def snapshots(root: Path, count: int, between=None) -> list[dict]:
+    """The first `count` snapshots of one agent run; `between(i)` runs after snapshot i, e.g. to change a file."""
+    proc = subprocess.Popen(["bash", "-s"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                            stderr=subprocess.DEVNULL, text=True)
+    out = []
+    try:
+        proc.stdin.write(build_agent(str(root), 3, "trainer_log.jsonl"))
+        proc.stdin.close()
+        for i in range(count):
+            out.append(json.loads(proc.stdout.readline()))
+            if between:
+                between(i)
+        return out
+    finally:
+        proc.kill()
+        proc.wait()
+        proc.stdout.close()
+
+
 class AgentTest(unittest.TestCase):
+    def test_unchanged_files_are_not_sent_again(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            log, metrics = root / "a.log", root / "trainer_log.jsonl"
+            log.write_text("one\ntwo\n")
+            metrics.write_text(json.dumps({"step": 1, "loss": 2.0}) + "\n")
+
+            def change(i):
+                if i == 1:  # after the second snapshot
+                    log.write_text("one\ntwo\nthree\n")
+
+            first, second, third = snapshots(root, 3, change)
+        self.assertEqual(first["log"]["lines"], ["one", "two"])
+        self.assertEqual(len(first["train"]["records"]), 1)
+        self.assertTrue(second["log"]["same"] and second["train"]["same"])
+        self.assertNotIn("lines", second["log"])
+        self.assertNotIn("records", second["train"])
+        self.assertEqual(third["log"]["lines"], ["one", "two", "three"])  # changed, so sent in full again
+        self.assertTrue(third["train"]["same"])
+
     def test_reads_newest_log_and_metrics(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -13,15 +13,16 @@ class ConfigError(ValueError):
 @dataclass(frozen=True)
 class PodConfig:
     name: str
-    host: str
-    port: int = 22
-    user: str = "root"
+    host: str  # an address, or a Host alias from ~/.ssh/config
+    user: str | None = None  # None: leave it to ssh (~/.ssh/config, then your local user name)
+    port: int | None = None  # None: leave it to ssh (~/.ssh/config, then 22)
     key: str | None = None
+    jump: str | None = None  # bastion for ssh -J, e.g. "ops@bastion.example.com"
     root: str = "/workspace"  # remote directory scanned for logs
     train_log: str = "trainer_log.jsonl"  # file name of the per-step metrics, one JSON object per line
 
 
-DEFAULT_KEYS = ("port", "user", "key", "root", "train_log")
+DEFAULT_KEYS = ("user", "port", "key", "jump", "root", "train_log")
 
 
 def load_config(path: Path) -> list[PodConfig]:
@@ -39,9 +40,9 @@ def load_config(path: Path) -> list[PodConfig]:
         if "name" not in merged or "host" not in merged:
             raise ConfigError(f"pod #{index}: 'name' and 'host' are required")
         pod = PodConfig(**merged)
-        if pod.host.startswith("-") or pod.user.startswith("-"):
-            raise ConfigError(f"pod {pod.name!r}: host and user must not start with '-'")
-        if not isinstance(pod.port, int) or not 0 < pod.port < 65536:
+        if any(value and value.startswith("-") for value in (pod.host, pod.user, pod.jump)):
+            raise ConfigError(f"pod {pod.name!r}: host, user and jump must not start with '-'")
+        if pod.port is not None and (not isinstance(pod.port, int) or not 0 < pod.port < 65536):
             raise ConfigError(f"pod {pod.name!r}: port must be 1-65535")
         pods.append(pod)
     if not pods:

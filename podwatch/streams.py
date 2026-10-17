@@ -28,6 +28,10 @@ class Stream(threading.Thread):
         self.gpu_history = (*self.gpu_history, util)[-GPU_HISTORY:]
 
     def receive(self, data: Snapshot) -> None:
+        for key, field in (("log", "lines"), ("train", "records")):
+            item = data.get(key)
+            if item and item.pop("same", False):  # the pod says this file is unchanged: keep what we have
+                item[field] = (self.data.get(key) or {}).get(field, [])
         self.data, self.seen = data, time.time()
         if data.get("gpus"):
             self.remember(sum(gpu[0] for gpu in data["gpus"]) / len(data["gpus"]))
@@ -88,7 +92,12 @@ def ssh_command(pod: PodConfig) -> list[str]:
                "-o", "ServerAliveCountMax=2", "-o", "StrictHostKeyChecking=accept-new"]
     if pod.key:
         command += ["-i", str(Path(pod.key).expanduser())]
-    return command + ["-p", str(pod.port), f"{pod.user}@{pod.host}", "bash", "-s"]
+    if pod.jump:
+        command += ["-J", pod.jump]
+    if pod.port:
+        command += ["-p", str(pod.port)]
+    target = f"{pod.user}@{pod.host}" if pod.user else pod.host
+    return command + [target, "bash", "-s"]
 
 
 LOCAL_COMMAND = ["bash", "-s"]
